@@ -9,6 +9,7 @@
     <packaging>pom</packaging>
     <version>0.0.1-SNAPSHOT</version>
     <modules>
+        <module>annotation-processor</module>
         <module>annotation-user</module>
     </modules>
 
@@ -16,5 +17,4 @@
         <maven.compiler.source>16</maven.compiler.source>
         <maven.compiler.target>16</maven.compiler.target>
     </properties>
-
 </project>
