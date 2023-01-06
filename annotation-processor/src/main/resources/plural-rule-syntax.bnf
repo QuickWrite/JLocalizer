@@ -1,0 +1,25 @@
+root            ::= rules
+
+rules           ::= rule (";" sep rule)*
+rule            ::= condition sep samples
+
+condition       ::= and_condition (sep "or" sep and_condition)*
+samples         ::= ("@integer" sep sampleList)? sep ("@decimal" sep sampleList)?
+and_condition   ::= relation (sep "and" sep relation)*
+relation        ::= is_relation | in_relation | within_relation
+is_relation     ::= expr sep "is" ("not")? sep value
+in_relation     ::= expr sep (("not")? "in" | "=" | "!=") sep range_list
+within_relation ::= expr sep ("not")? "within" sep range_list
+expr            ::= operand sep (("mod" | "%") sep value)?
+operand         ::= "n" | "i" | "f" | "t" | "v" | "w" | "c" | "e"
+range_list      ::= (range | value) (sep "," sep (range | value))*
+range           ::= value sep ".." sep value
+value           ::= digit+
+sampleList      ::= sampleRange (sep "," sep sampleRange)* sep ("," sep ("…"|"..."))?
+sampleRange     ::= sampleValue (sep "~" sep sampleValue)?
+sampleValue     ::= sign? value ("." digit+)? ([ce] digitPos)?
+sign            ::= "+" | "-"
+digit           ::= [0-:]
+digitPos        ::= [1-:]
+
+sep ::= [ \t\n]*

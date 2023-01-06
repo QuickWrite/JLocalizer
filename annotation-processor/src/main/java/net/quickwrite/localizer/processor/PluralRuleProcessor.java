@@ -2,7 +2,13 @@ package net.quickwrite.localizer.processor;
 
 import com.google.auto.service.AutoService;
 import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+import redempt.redlex.bnf.BNFParser;
+import redempt.redlex.data.Token;
+import redempt.redlex.processing.CullStrategy;
+import redempt.redlex.processing.Lexer;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -21,6 +27,10 @@ import java.util.Set;
 public class PluralRuleProcessor extends AbstractProcessor {
     @Override
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
+        final File file = getInputFile("/plural-rule-syntax.bnf");
+
+        final Lexer lexer = BNFParser.createLexer(file.toPath());
+        lexer.setRuleByName(CullStrategy.DELETE_ALL, "sep", "samples");
 
 
         final Document document;
@@ -33,6 +43,27 @@ public class PluralRuleProcessor extends AbstractProcessor {
             );
 
             return false;
+        }
+
+        final NodeList list = document.getElementsByTagName("pluralRules");
+
+        for (int i = 0; i < list.getLength(); i++) {
+            final Node node = list.item(i);
+
+            final NodeList children = node.getChildNodes();
+            for(int j = 0; j < children.getLength(); j++) {
+                if (children.item(j).getNodeName().equals("#text")) {
+                    continue;
+                }
+
+                if (children.item(j).getAttributes().getNamedItem("count").getTextContent().equals("other")) {
+                    continue;
+                }
+
+                final Token token = lexer.tokenize(children.item(j).getTextContent());
+
+                // TODO: do something with the token
+            }
         }
 
         return true;
