@@ -17,10 +17,7 @@ import javax.tools.Diagnostic;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 @SupportedAnnotationTypes("net.quickwrite.localizer.processor.PluralRuleGen")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
@@ -63,8 +60,6 @@ public class PluralRuleProcessor extends AbstractProcessor {
 
                 final Token token = lexer.tokenize(children.item(j).getTextContent());
 
-                // TODO: do something with the token
-
                 unwrapConditions(token.allByName("and_condition"));
             }
         }
@@ -101,44 +96,71 @@ public class PluralRuleProcessor extends AbstractProcessor {
     }
 
     private void unwrapInRelation(final Token token, final StringBuilder builder) {
-        unwrapExpr(token.getChildren()[0], builder);
-        builder.append(" ");
-
-        final String value = token.getChildren()[1].getValue();
-        if (value.equals("=")) {
-            builder.append("=");
+        final List<Token> rangeToken = unwrapRangeList(token.getChildren()[2]);
+        if (rangeToken.size() != 1) {
+            builder.append("(");
         }
-        builder.append(value);
-        builder.append(" ");
-        unwrapRangeList(token.getChildren()[2], builder);
+
+        for (int i = 0; i < rangeToken.size(); i++) {
+            if (i != 0) {
+                builder.append(" || ");
+            }
+
+            boolean isRange = rangeToken.get(i).getType().getName().equals("range");
+
+            builder.append("(");
+            final String operator = token.getChildren()[1].getValue();
+
+            if (isRange) {
+                if (operator.equals("!=")) {
+                    builder.append("!");
+                }
+                builder.append("isInRange(");
+            }
+            unwrapExpr(token.getChildren()[0], builder);
+
+            if (isRange) {
+                builder.append(", ");
+                final String[] rangeValues = unwrapRange(rangeToken.get(i));
+                builder.append(rangeValues[0]);
+                builder.append(", ");
+                builder.append(rangeValues[1]);
+                builder.append(")");
+            } else {
+                builder.append(" ");
+                if (operator.equals("=")) {
+                    builder.append("=");
+                }
+                builder.append(operator);
+                builder.append(" ");
+                builder.append(rangeToken.get(i).getValue());
+            }
+            builder.append(")");
+        }
+
+        if (rangeToken.size() != 1) {
+            builder.append(")");
+        }
     }
 
-    private void unwrapRangeList(final Token token, final StringBuilder builder) {
+    private List<Token> unwrapRangeList(final Token token) {
         assert !token.getType().getName().equals("range_list");
 
+        List<Token> list = new ArrayList<>();
+
         final Token[] tokens = token.getChildren();
-        final Token firstToken = tokens[0].getChildren()[0];
-        if (firstToken.getType().getName().equals("value")) {
-            builder.append(firstToken.getValue());
-        } else {
-            unwrapRange(firstToken, builder);
-        }
+        list.add(tokens[0].getChildren()[0]);
 
         if (tokens.length == 1) {
-            return;
+            return list;
         }
 
         //builder.append(" ");
-        for (Token token1 : token.getChildren()[1].getChildren()) {
-            builder.append(",");
-            final Token moreToken = token1.getChildren()[1].getChildren()[0];
-            if (moreToken.getType().getName().equals("value")) {
-                builder.append(moreToken.getValue());
-                continue;
-            }
-
-            unwrapRange(moreToken, builder);
+        for (final Token nextToken : token.getChildren()[1].getChildren()) {
+            list.add(nextToken.getChildren()[1].getChildren()[0]);
         }
+
+        return list;
     }
 
     private void unwrapExpr(final Token token, final StringBuilder builder) {
@@ -158,10 +180,8 @@ public class PluralRuleProcessor extends AbstractProcessor {
         builder.append(children[1].allByName("value").get(0).getValue());
     }
 
-    private void unwrapRange(final Token token, final StringBuilder builder) {
+    private String[] unwrapRange(final Token token) {
         assert !token.getType().getName().equals("range");
-        builder.append(token.getChildren()[0].getValue());
-        builder.append(" to ");
-        builder.append(token.getChildren()[2].getValue());
+        return new String[] {token.getChildren()[0].getValue(), token.getChildren()[2].getValue()};
     }
 }
