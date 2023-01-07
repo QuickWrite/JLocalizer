@@ -14,6 +14,7 @@ import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
@@ -23,13 +24,20 @@ import java.util.*;
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 @AutoService(Processor.class)
 public class PluralRuleProcessor extends AbstractProcessor {
+    private static boolean test = false;
+
     @Override
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
+        if (test) {
+            return true;
+        }
+        test = true;
+
         final File file = getInputFile("/plural-rule-syntax.bnf");
 
         final Lexer lexer = BNFParser.createLexer(file.toPath());
         lexer.setRuleByName(CullStrategy.DELETE_ALL, "sep", "samples");
-
+        lexer.setRuleByName(CullStrategy.LIFT_CHILDREN, "digit");
 
         final Document document;
         try {
@@ -44,24 +52,10 @@ public class PluralRuleProcessor extends AbstractProcessor {
         }
 
         final NodeList list = document.getElementsByTagName("pluralRules");
-
-        for (int i = 0; i < list.getLength(); i++) {
-            final Node node = list.item(i);
-
-            final NodeList children = node.getChildNodes();
-            for(int j = 0; j < children.getLength(); j++) {
-                if (children.item(j).getNodeName().equals("#text")) {
-                    continue;
-                }
-
-                if (children.item(j).getAttributes().getNamedItem("count").getTextContent().equals("other")) {
-                    continue;
-                }
-
-                final Token token = lexer.tokenize(children.item(j).getTextContent());
-
-                unwrapConditions(token.allByName("and_condition"));
-            }
+        try {
+            writePluralRuleFile(lexer, list);
+        } catch (final IOException exception) {
+            exception.printStackTrace();
         }
 
         return true;
@@ -77,7 +71,107 @@ public class PluralRuleProcessor extends AbstractProcessor {
         return dbf.newDocumentBuilder().parse(getInputFile(path));
     }
 
-    private void unwrapConditions(final List<Token> tokens) {
+    private void writePluralRuleFile(final Lexer lexer, final NodeList pluralRules) throws IOException {
+        final StringBuilder out = new StringBuilder();
+            out.append("package net.quickwrite.localizer;\n\n");
+            out.append("""
+                    import java.util.HashMap;
+                    import java.util.Map;
+                    import java.util.function.Function;
+                    
+                    """);
+
+            out.append("public class PluralRuleChecker {\n");
+            out.append("   private static Map<String, Function<PluralOperand, PluralCategory>> PLURALIZATION_MAP;\n\n");
+            out.append("   static {\n" +
+                    "      PLURALIZATION_MAP = new HashMap<>(" + pluralRules.getLength() + ");\n");
+            for (int i = 0; i < pluralRules.getLength(); i++) {
+                final Node node = pluralRules.item(i);
+
+                out.append("addRule(new String[] { ");
+
+                final String[] locales = node.getAttributes().getNamedItem("locales").getNodeValue().split(" ");
+                for(int j = 0; j < locales.length; j++) {
+                    if (j != 0) {
+                        out.append(", ");
+                    }
+
+                    out.append("\"");
+                    out.append(locales[j]);
+                    out.append("\"");
+                }
+
+                out.append(" }, operand -> {");
+
+                for(final PluralRuleTuple tuple : getRulesForLangs(lexer, node)) {
+                    out.append("   if(");
+                    out.append(tuple.unwrappedConditions());
+                    out.append(") {\n");
+                    out.append("      return PluralCategory.");
+                    out.append(tuple.type().toUpperCase());
+                    out.append(";\n   }");
+                }
+                out.append("   return PluralCategory.OTHER;\n}\n");
+                out.append(");\n\n");
+            }
+
+            out.append("   }\n");
+
+            out.append("""
+                       public static Function<PluralOperand, PluralCategory> getPluralizer(final String key) {
+                            return PLURALIZATION_MAP.get(key);
+                       }
+                       """);
+
+            out.append("""
+                        private static void addRule(final String[] cultures, final Function<PluralOperand, PluralCategory> rule) {
+                            for (final String culture : cultures) {
+                                PLURALIZATION_MAP.put(culture, rule);
+                            }
+                        }
+                        """);
+
+            out.append("""
+                       private static boolean isInRange(int value, int min, int max) {
+                          return min <= value && value <= max;
+                       }
+                       """);
+            out.append("""
+                       private static boolean isInRange(double value, int min, int max) {
+                          return min <= value && value <= max;
+                       }
+                       """);
+
+            out.append("}");
+
+            generateClass(out.toString());
+    }
+
+    private List<PluralRuleTuple> getRulesForLangs(final Lexer lexer, final Node node) {
+        final List<PluralRuleTuple> list = new ArrayList<>();
+
+        final NodeList children = node.getChildNodes();
+        for(int j = 0; j < children.getLength(); j++) {
+            if (children.item(j).getNodeName().equals("#text")) {
+                continue;
+            }
+
+            final String type = children.item(j).getAttributes().getNamedItem("count").getTextContent();
+            if (type.equals("other")) {
+                continue;
+            }
+
+            final Token token = lexer.tokenize(children.item(j).getTextContent());
+
+            final String condition = unwrapConditions(token.allByName("and_condition"));
+
+            list.add(new PluralRuleTuple(type, condition));
+        }
+
+        return list;
+    }
+
+    private String unwrapConditions(final List<Token> tokens) {
         final StringBuilder builder = new StringBuilder();
         for(int i = 0; i < tokens.size(); i++) {
             if (i != 0) {
@@ -93,6 +187,8 @@ public class PluralRuleProcessor extends AbstractProcessor {
                 unwrapInRelation(inRelationTokens.get(j), builder);
             }
         }
+
+        return builder.toString();
     }
 
     private void unwrapInRelation(final Token token, final StringBuilder builder) {
@@ -155,7 +251,6 @@ public class PluralRuleProcessor extends AbstractProcessor {
             return list;
         }
 
-        //builder.append(" ");
         for (final Token nextToken : token.getChildren()[1].getChildren()) {
             list.add(nextToken.getChildren()[1].getChildren()[0]);
         }
@@ -183,5 +278,16 @@ public class PluralRuleProcessor extends AbstractProcessor {
     private String[] unwrapRange(final Token token) {
         assert !token.getType().getName().equals("range");
         return new String[] {token.getChildren()[0].getValue(), token.getChildren()[2].getValue()};
+    }
+
+    private void generateClass(final String file) throws IOException {
+        final JavaFileObject sourceFile = processingEnv.getFiler().createSourceFile("net.quickwrite.localizer.PluralRuleChecker");
+        final Writer writer = sourceFile.openWriter();
+        writer.write(file);
+        writer.close();
+    }
+
+    private static record PluralRuleTuple(String type, String unwrappedConditions) {
+
     }
 }

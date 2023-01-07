@@ -185,4 +185,9 @@ package net.quickwrite.localizer;
  */
 public record PluralOperand(double n, long i, int v, int w, long f, long t) {
     // TODO: Add methods that convert {@link Number} to {@link PluralOperand}.
+
+    // TODO: Skip this value later
+    public int e() {
+        return 0;
+    }
 }
