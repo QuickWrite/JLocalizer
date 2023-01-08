@@ -17,7 +17,9 @@ import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.Writer;
 import java.util.*;
 
 @SupportedAnnotationTypes("net.quickwrite.localizer.processor.PluralRuleGen")
@@ -78,8 +80,8 @@ public class PluralRuleProcessor extends AbstractProcessor {
         );
 
         generator.addImport("java.util.HashMap")
-                 .addImport("java.util.Map")
-                 .addImport("java.util.function.Function");
+                .addImport("java.util.Map")
+                .addImport("java.util.function.Function");
 
         generator.addAttribute("private static Map<String, Function<PluralOperand, PluralCategory>> PLURALIZATION_MAP;");
 
@@ -92,7 +94,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
             builder.append("addRule(new String[] { ");
 
             final String[] locales = node.getAttributes().getNamedItem("locales").getNodeValue().split(" ");
-            for(int j = 0; j < locales.length; j++) {
+            for (int j = 0; j < locales.length; j++) {
                 if (j != 0) {
                     builder.append(", ");
                 }
@@ -104,7 +106,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
 
             builder.append(" }, operand -> {\n");
 
-            for(final PluralRuleTuple tuple : getRulesForLangs(lexer, node)) {
+            for (final PluralRuleTuple tuple : getRulesForLangs(lexer, node)) {
                 builder.append("   if(");
                 builder.append(tuple.unwrappedConditions());
                 builder.append(") {\n");
@@ -119,44 +121,44 @@ public class PluralRuleProcessor extends AbstractProcessor {
 
 
         generator.addMethod("""
-                       public static Function<PluralOperand, PluralCategory> getPluralizer(final String key) {
-                            return PLURALIZATION_MAP.get(key);
-                       }
-                       """);
+                public static Function<PluralOperand, PluralCategory> getPluralizer(final String key) {
+                     return PLURALIZATION_MAP.get(key);
+                }
+                """);
 
 
         generator.addMethod("""
-                        private static void addRule(final String[] cultures, final Function<PluralOperand, PluralCategory> rule) {
-                            for (final String culture : cultures) {
-                                PLURALIZATION_MAP.put(culture, rule);
-                            }
-                        }
-                        """);
+                private static void addRule(final String[] cultures, final Function<PluralOperand, PluralCategory> rule) {
+                    for (final String culture : cultures) {
+                        PLURALIZATION_MAP.put(culture, rule);
+                    }
+                }
+                """);
 
         generator.addMethod("""
-                        private static boolean isInRange(int value, int min, int max) {
-                          return min <= value && value <= max;
-                        }
-                        """)
-                 .addMethod("""
+                private static boolean isInRange(int value, int min, int max) {
+                  return min <= value && value <= max;
+                }
+                """)
+                .addMethod("""
                         private static boolean isInRange(long value, int min, int max) {
                           return min <= value && value <= max;
                         }
                         """)
-                 .addMethod("""
+                .addMethod("""
                         private static boolean isInRange(double value, int min, int max) {
                           return min <= value && value <= max;
                         }
                         """);
 
-            generateClass(generator.generate());
+        generateClass(generator.generate());
     }
 
     private List<PluralRuleTuple> getRulesForLangs(final Lexer lexer, final Node node) {
         final List<PluralRuleTuple> list = new ArrayList<>();
 
         final NodeList children = node.getChildNodes();
-        for(int j = 0; j < children.getLength(); j++) {
+        for (int j = 0; j < children.getLength(); j++) {
             if (children.item(j).getNodeName().equals("#text")) {
                 continue;
             }
@@ -178,7 +180,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
 
     private String unwrapConditions(final List<Token> tokens) {
         final StringBuilder builder = new StringBuilder();
-        for(int i = 0; i < tokens.size(); i++) {
+        for (int i = 0; i < tokens.size(); i++) {
             if (i != 0) {
                 builder.append(" || ");
             }
@@ -282,7 +284,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
 
     private String[] unwrapRange(final Token token) {
         assert !token.getType().getName().equals("range");
-        return new String[] {token.getChildren()[0].getValue(), token.getChildren()[2].getValue()};
+        return new String[]{token.getChildren()[0].getValue(), token.getChildren()[2].getValue()};
     }
 
     private void generateClass(final String file) throws IOException {

@@ -7,8 +7,8 @@ package net.quickwrite.localizer;
  * </a>.
  *
  * <p>
- *     When {@code N} is the number that is stored the following values of the number are defined in this
- *     record like this:
+ * When {@code N} is the number that is stored the following values of the number are defined in this
+ * record like this:
  * <table>
  *     <thead>
  *         <tr>

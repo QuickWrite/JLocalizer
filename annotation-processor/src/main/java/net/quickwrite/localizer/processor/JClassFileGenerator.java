@@ -1,7 +1,5 @@
 package net.quickwrite.localizer.processor;
 
-import org.checkerframework.checker.units.qual.A;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -54,27 +52,27 @@ public class JClassFileGenerator {
 
     public String generate() {
         return String.format("""
-                /**
-                * This file was automatically generated.
-                * Don't change this class as these changes will be lost.
-                */
-                package %s;
-                
-                %s
-                
-                public class %s {
-                    // attributes
-                    %s
-                    
-                    // static constructor
-                    static {
+                        /**
+                        * This file was automatically generated.
+                        * Don't change this class as these changes will be lost.
+                        */
+                        package %s;
+                                        
                         %s
-                    }
-                    
-                    // methods
-                    %s
-                }
-                """,
+                                        
+                        public class %s {
+                            // attributes
+                            %s
+                            
+                            // static constructor
+                            static {
+                                %s
+                            }
+                            
+                            // methods
+                            %s
+                        }
+                        """,
                 this.packageName,
                 formatImports(this.imports),
                 this.className,
@@ -106,7 +104,7 @@ public class JClassFileGenerator {
         for (int i = 0; i < list.size(); i++) {
             final String[] stringList = list.get(i).split("\n");
 
-            for(int j = 0; j < stringList.length; j++) {
+            for (int j = 0; j < stringList.length; j++) {
                 if (!(i == 0 && j == 0)) {
                     builder.append(" ".repeat(Math.max(0, indent)));
                 }
