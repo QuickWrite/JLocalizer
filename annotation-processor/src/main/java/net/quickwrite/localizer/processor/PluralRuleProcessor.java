@@ -135,8 +135,11 @@ public class PluralRuleProcessor extends AbstractProcessor {
                        private static boolean isInRange(int value, int min, int max) {
                           return min <= value && value <= max;
                        }
-                       """);
-            out.append("""
+                       
+                       private static boolean isInRange(long value, int min, int max) {
+                          return min <= value && value <= max;
+                       }
+                       
                        private static boolean isInRange(double value, int min, int max) {
                           return min <= value && value <= max;
                        }
