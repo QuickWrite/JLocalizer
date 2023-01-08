@@ -22,6 +22,7 @@ import net.quickwrite.localizer.processor.PluralRuleGen;
  *     </ul>
  * </p>
  */
+@PluralRuleGen(packageName = "net.quickwrite.localizer", operand = PluralOperand.class, category = PluralCategory.class)
 public enum PluralCategory {
     ZERO,
     ONE,

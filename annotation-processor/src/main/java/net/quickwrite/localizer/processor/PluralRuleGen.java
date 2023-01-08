@@ -8,5 +8,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.SOURCE)
 public @interface PluralRuleGen {
-    String value();
+    String packageName();
+    Class<?> operand();
+    Class<? extends Enum<?>> category();
 }
