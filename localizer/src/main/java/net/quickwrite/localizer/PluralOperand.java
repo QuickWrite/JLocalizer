@@ -1,5 +1,9 @@
 package net.quickwrite.localizer;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Objects;
+
 /**
  * Plural operands defined by
  * <a href="https://unicode.org/reports/tr35/tr35-numbers.html#Plural_Operand_Meanings">
@@ -184,10 +188,84 @@ package net.quickwrite.localizer;
  * </p>
  */
 public record PluralOperand(double n, long i, int v, int w, long f, long t) {
-    // TODO: Add methods that convert {@link Number} to {@link PluralOperand}.
+    public static PluralOperand from(final int value) {
+        return new PluralOperand(value, value, 0, 0, 0, 0);
+    }
+
+    public static PluralOperand from(final long value) {
+        return new PluralOperand(value, value, 0, 0, 0, 0);
+    }
+
+    public static PluralOperand from(final double value) {
+        return from(Double.toString(value));
+    }
+
+    public static PluralOperand from(final BigDecimal value) {
+        final BigDecimal noTrailingZeros = value.stripTrailingZeros();
+        final long nonTrailingZeroFraction = noTrailingZeros
+                .remainder(BigDecimal.ONE)
+                .abs()
+                .movePointRight(noTrailingZeros.scale())
+                .longValue();
+
+        return new PluralOperand(
+                value.doubleValue(),
+                value.longValue(),
+                value.scale(),
+                noTrailingZeros.scale(),
+                nonTrailingZeroFraction * powerN(10, value.scale() - noTrailingZeros.scale()),
+                nonTrailingZeroFraction
+        );
+    }
+
+    public static PluralOperand from(final BigInteger value) {
+        return new PluralOperand(value.doubleValue(), value.longValue(), 0, 0, 0, 0);
+    }
+
+    public static PluralOperand from(final String value) {
+        return from(new BigDecimal(value));
+    }
 
     // TODO: Skip this value later
     public int e() {
         return 0;
+    }
+
+    private static long powerN(final long number, int power){
+        long res = 1;
+        long sq = number;
+        while(power > 0){
+            if(power % 2 == 1){
+                res *= sq;
+            }
+            sq = sq * sq;
+            power /= 2;
+        }
+        return res;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        PluralOperand operand = (PluralOperand) o;
+        return Double.compare(operand.n, n) == 0 && i == operand.i && v == operand.v && w == operand.w && f == operand.f && t == operand.t;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(n, i, v, w, f, t);
+    }
+
+    @Override
+    public String toString() {
+        return "PluralOperand{" +
+                "n=" + n +
+                ", i=" + i +
+                ", v=" + v +
+                ", w=" + w +
+                ", f=" + f +
+                ", t=" + t +
+                '}';
     }
 }
