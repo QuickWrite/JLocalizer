@@ -113,7 +113,9 @@ public class PluralRuleProcessor extends AbstractProcessor {
 
         generator.addAttribute("private static Map<String, Function<" +
                 operand.getClassName() +
-                ", PluralCategory>> PLURALIZATION_MAP;");
+                ", " +
+                category.getClassName() +
+                ">> PLURALIZATION_MAP;");
 
         generator.addStaticConstructorElement("PLURALIZATION_MAP = new HashMap<>();");
 
