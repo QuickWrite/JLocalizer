@@ -1,4 +1,4 @@
-package net.quickwrite.localizer.processor;
+package net.quickwrite.localizer.processor.generator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +14,8 @@ public class JClassFileGenerator {
 
     private final List<String> staticConstructor;
 
+    private final List<String> constructor;
+
     public JClassFileGenerator(final String packageName, final String className) {
         this.packageName = packageName;
         this.className = className;
@@ -24,6 +26,7 @@ public class JClassFileGenerator {
         this.methods = new ArrayList<>();
 
         this.staticConstructor = new ArrayList<>();
+        this.constructor = new ArrayList<>();
     }
 
     public JClassFileGenerator addImport(final String importPath) {
@@ -50,6 +53,12 @@ public class JClassFileGenerator {
         return this;
     }
 
+    public JClassFileGenerator addConstructor(final String constructor) {
+        this.constructor.add(constructor);
+
+        return this;
+    }
+
     public String generate() {
         return String.format("""
                         /**
@@ -69,6 +78,9 @@ public class JClassFileGenerator {
                                 %s
                             }
                             
+                            // constructor
+                            %s
+                            
                             // methods
                             %s
                         }
@@ -78,11 +90,12 @@ public class JClassFileGenerator {
                 this.className,
                 formatLines(this.attributes, 4),
                 formatLines(this.staticConstructor, 8),
+                formatLines(this.constructor, 4),
                 formatLines(this.methods, 4)
         );
     }
 
-    private static String formatImports(final List<String> imports) {
+    protected static String formatImports(final List<String> imports) {
         final StringBuilder builder = new StringBuilder();
 
         for (int i = 0; i < imports.size(); i++) {
@@ -98,7 +111,7 @@ public class JClassFileGenerator {
         return builder.toString();
     }
 
-    private static String formatLines(final List<String> list, final int indent) {
+    protected static String formatLines(final List<String> list, final int indent) {
         final StringBuilder builder = new StringBuilder();
 
         for (int i = 0; i < list.size(); i++) {
@@ -122,5 +135,33 @@ public class JClassFileGenerator {
         }
 
         return builder.toString();
+    }
+
+    public String getPackageName() {
+        return packageName;
+    }
+
+    public String getClassName() {
+        return className;
+    }
+
+    public List<String> getImports() {
+        return imports;
+    }
+
+    public List<String> getAttributes() {
+        return attributes;
+    }
+
+    public List<String> getMethods() {
+        return methods;
+    }
+
+    public List<String> getStaticConstructor() {
+        return staticConstructor;
+    }
+
+    public List<String> getConstructor() {
+        return constructor;
     }
 }
