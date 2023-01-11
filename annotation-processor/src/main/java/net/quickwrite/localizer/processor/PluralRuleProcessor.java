@@ -100,9 +100,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
                 "PluralRuleChecker"
         );
 
-        generator.addImport("java.util.HashMap")
-                .addImport("java.util.Map")
-                .addImport("java.util.function.Function");
+        generator.addImport("java.util.function.Function");
 
         if (!operand.getPackageName().equals(packageName)) {
             generator.addImport(operand.getFullName());
