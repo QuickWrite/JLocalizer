@@ -1,6 +1,7 @@
 package net.quickwrite.localizer.processor;
 
 import com.google.auto.service.AutoService;
+import net.quickwrite.localizer.processor.generator.JEnumFileGenerator;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -94,7 +95,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
                                      final Lexer lexer,
                                      final NodeList pluralRules)
             throws IOException {
-        final JClassFileGenerator generator = new JClassFileGenerator(
+        final JEnumFileGenerator generator = new JEnumFileGenerator(
                 packageName,
                 "PluralRuleChecker"
         );
@@ -111,30 +112,17 @@ public class PluralRuleProcessor extends AbstractProcessor {
             generator.addImport(category.getFullName());
         }
 
-        generator.addAttribute("private static Map<String, Function<" +
-                operand.getClassName() +
-                ", " +
-                category.getClassName() +
-                ">> PLURALIZATION_MAP;");
-
-        generator.addStaticConstructorElement("PLURALIZATION_MAP = new HashMap<>();");
+        generator.addAttribute("private final Function<PluralOperand, PluralCategory> localizationFunction;");
 
         for (int i = 0; i < pluralRules.getLength(); i++) {
-            StringBuilder builder = new StringBuilder();
+            final StringBuilder builder = new StringBuilder();
             final Node node = pluralRules.item(i);
 
-            builder.append("addRule(new String[] { ");
-
             final String[] locales = node.getAttributes().getNamedItem("locales").getNodeValue().split(" ");
-            for (int j = 0; j < locales.length; j++) {
-                if (j != 0) {
-                    builder.append(", ");
-                }
+            final String firstLocale = locales[0].toUpperCase();
+            builder.append(firstLocale);
 
-                builder.append("\"").append(locales[j]).append("\"");
-            }
-
-            builder.append(" }, operand -> {\n");
+            builder.append("((operand) -> {\n");
 
             for (final PluralRuleTuple tuple : getRulesForLangs(lexer, node)) {
                 builder.append("   if(")
@@ -144,40 +132,42 @@ public class PluralRuleProcessor extends AbstractProcessor {
                         .append(tuple.type().toUpperCase())
                         .append(";\n   }\n\n");
             }
-            builder.append("   return ").append(category.getClassName()).append(".OTHER;\n});\n");
+            builder.append("   return ").append(category.getClassName()).append(".OTHER;\n})");
 
-            generator.addStaticConstructorElement(builder.toString());
+            generator.addEnumValue(builder.toString());
+
+            for (int j = 1; j < locales.length; j++) {
+                final String result = locales[j].toUpperCase() +
+                        "(" + firstLocale + ".localizationFunction)";
+
+                generator.addEnumValue(result);
+            }
         }
 
-
-        generator.addMethod("""
-                public static Function<PluralOperand, PluralCategory> getPluralizer(final String key) {
-                     return PLURALIZATION_MAP.get(key);
-                }
-                """);
-
-
-        generator.addMethod("""
-                private static void addRule(final String[] cultures, final Function<PluralOperand, PluralCategory> rule) {
-                    for (final String culture : cultures) {
-                        PLURALIZATION_MAP.put(culture, rule);
-                    }
+        generator.addConstructor("""
+                PluralRuleChecker(final Function<PluralOperand, PluralCategory> localizationFunction) {
+                    this.localizationFunction = localizationFunction;
                 }
                 """);
 
         generator.addMethod("""
-                private static boolean isInRange(int value, int min, int max) {
-                  return min <= value && value <= max;
-                }
-                """)
+                        public PluralCategory getCategory(final PluralOperand operand) {
+                            return this.localizationFunction.apply(operand);
+                        }
+                        """)
+                .addMethod("""
+                        private static boolean isInRange(int value, int min, int max) {
+                            return min <= value && value <= max;
+                        }
+                        """)
                 .addMethod("""
                         private static boolean isInRange(long value, int min, int max) {
-                          return min <= value && value <= max;
+                            return min <= value && value <= max;
                         }
                         """)
                 .addMethod("""
                         private static boolean isInRange(double value, int min, int max) {
-                          return min <= value && value <= max;
+                            return min <= value && value <= max;
                         }
                         """);
 
