@@ -7,7 +7,6 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 import redempt.redlex.bnf.BNFParser;
-import redempt.redlex.data.Token;
 import redempt.redlex.processing.CullStrategy;
 import redempt.redlex.processing.Lexer;
 
@@ -29,28 +28,41 @@ import java.util.*;
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 @AutoService(Processor.class)
 public class PluralRuleProcessor extends AbstractProcessor {
+    private List<PluralRule> pluralRules;
+
     @Override
-    public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+
         final File file = getInputFile("/plural-rule-syntax.bnf");
 
         final Lexer lexer = BNFParser.createLexer(file.toPath());
         lexer.setRuleByName(CullStrategy.DELETE_ALL, "sep", "samples");
         lexer.setRuleByName(CullStrategy.LIFT_CHILDREN, "digit");
 
-        final Document document;
+        final NodeList nodePluralRules;
         try {
-            document = getXMLDocument("/plurals.xml");
+            final Document document = getXMLDocument("/plurals.xml");
+
+            nodePluralRules = document.getElementsByTagName("pluralRules");
         } catch (final ParserConfigurationException | IOException | SAXException e) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                     "An exception occurred while trying to parse the input file for @PluralRuleGen -> \n" +
                             Arrays.toString(e.getStackTrace())
             );
 
-            return false;
+            return;
         }
 
-        final NodeList list = document.getElementsByTagName("pluralRules");
+        pluralRules = new ArrayList<>(nodePluralRules.getLength());
 
+        for (int i = 0; i < nodePluralRules.getLength(); i++) {
+            pluralRules.add(new PluralRule(lexer, nodePluralRules.item(i)));
+        }
+    }
+
+    @Override
+    public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
         try {
             for (final Element element : roundEnv.getRootElements()) {
 
@@ -64,9 +76,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
                     writePluralRuleFile(
                             ruleGen.packageName(),
                             getAnnotationClassValue(element, PluralRuleGen.class, "operand"),
-                            getAnnotationClassValue(element, PluralRuleGen.class, "category"),
-                            lexer,
-                            list
+                            getAnnotationClassValue(element, PluralRuleGen.class, "category")
                     );
                 } catch (final IOException exception) {
                     exception.printStackTrace();
@@ -91,9 +101,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
 
     private void writePluralRuleFile(final String packageName,
                                      final InternalClass operand,
-                                     final InternalClass category,
-                                     final Lexer lexer,
-                                     final NodeList pluralRules)
+                                     final InternalClass category)
             throws IOException {
         final JEnumFileGenerator generator = new JEnumFileGenerator(
                 packageName,
@@ -116,17 +124,15 @@ public class PluralRuleProcessor extends AbstractProcessor {
                 category.getClassName() +
                 "> localizationFunction;");
 
-        for (int i = 0; i < pluralRules.getLength(); i++) {
+        for (final PluralRule rule : pluralRules) {
             final StringBuilder builder = new StringBuilder();
-            final Node node = pluralRules.item(i);
 
-            final String[] locales = node.getAttributes().getNamedItem("locales").getNodeValue().split(" ");
-            final String firstLocale = locales[0].toUpperCase();
+            final String firstLocale = rule.getLocales()[0];
             builder.append(firstLocale);
 
             builder.append("((operand) -> {\n");
 
-            for (final PluralRuleTuple tuple : getRulesForLangs(lexer, node)) {
+            for (final PluralRule.PluralRuleTuple tuple : rule.getPluralRules()) {
                 builder.append("   if(")
                         .append(tuple.unwrappedConditions())
                         .append(") {\n")
@@ -138,8 +144,8 @@ public class PluralRuleProcessor extends AbstractProcessor {
 
             generator.addEnumValue(builder.toString());
 
-            for (int j = 1; j < locales.length; j++) {
-                final String result = locales[j].toUpperCase() +
+            for (int j = 1; j < rule.getLocales().length; j++) {
+                final String result = rule.getLocales()[j].toUpperCase() +
                         "(" + firstLocale + ".localizationFunction)";
 
                 generator.addEnumValue(result);
@@ -186,139 +192,6 @@ public class PluralRuleProcessor extends AbstractProcessor {
         generateClass(generator.generate());
     }
 
-    private List<PluralRuleTuple> getRulesForLangs(final Lexer lexer, final Node node) {
-        final List<PluralRuleTuple> list = new ArrayList<>();
-
-        final NodeList children = node.getChildNodes();
-        for (int j = 0; j < children.getLength(); j++) {
-            if (children.item(j).getNodeName().equals("#text")) {
-                continue;
-            }
-
-            final String type = children.item(j).getAttributes().getNamedItem("count").getTextContent();
-            if (type.equals("other")) {
-                continue;
-            }
-
-            final Token token = lexer.tokenize(children.item(j).getTextContent());
-
-            final String condition = unwrapConditions(token.allByName("and_condition"));
-
-            list.add(new PluralRuleTuple(type, condition));
-        }
-
-        return list;
-    }
-
-    private String unwrapConditions(final List<Token> tokens) {
-        final StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < tokens.size(); i++) {
-            if (i != 0) {
-                builder.append(" || ");
-            }
-
-            List<Token> inRelationTokens = tokens.get(i).allByName("in_relation");
-            for (int j = 0; j < inRelationTokens.size(); j++) {
-                if (j != 0) {
-                    builder.append(" && ");
-                }
-
-                unwrapInRelation(inRelationTokens.get(j), builder);
-            }
-        }
-
-        return builder.toString();
-    }
-
-    private void unwrapInRelation(final Token token, final StringBuilder builder) {
-        final List<Token> rangeToken = unwrapRangeList(token.getChildren()[2]);
-        if (rangeToken.size() != 1) {
-            builder.append("(");
-        }
-
-        for (int i = 0; i < rangeToken.size(); i++) {
-            if (i != 0) {
-                builder.append(" || ");
-            }
-
-            boolean isRange = rangeToken.get(i).getType().getName().equals("range");
-
-            builder.append("(");
-            final String operator = token.getChildren()[1].getValue();
-
-            if (isRange) {
-                if (operator.equals("!=")) {
-                    builder.append("!");
-                }
-                builder.append("isInRange(");
-            }
-            unwrapExpr(token.getChildren()[0], builder);
-
-            if (isRange) {
-                builder.append(", ");
-                final String[] rangeValues = unwrapRange(rangeToken.get(i));
-                builder.append(rangeValues[0]);
-                builder.append(", ");
-                builder.append(rangeValues[1]);
-                builder.append(")");
-            } else {
-                builder.append(" ");
-                if (operator.equals("=")) {
-                    builder.append("=");
-                }
-                builder.append(operator);
-                builder.append(" ");
-                builder.append(rangeToken.get(i).getValue());
-            }
-            builder.append(")");
-        }
-
-        if (rangeToken.size() != 1) {
-            builder.append(")");
-        }
-    }
-
-    private List<Token> unwrapRangeList(final Token token) {
-        assert !token.getType().getName().equals("range_list");
-
-        List<Token> list = new ArrayList<>();
-
-        final Token[] tokens = token.getChildren();
-        list.add(tokens[0].getChildren()[0]);
-
-        if (tokens.length == 1) {
-            return list;
-        }
-
-        for (final Token nextToken : token.getChildren()[1].getChildren()) {
-            list.add(nextToken.getChildren()[1].getChildren()[0]);
-        }
-
-        return list;
-    }
-
-    private void unwrapExpr(final Token token, final StringBuilder builder) {
-        assert !token.getType().getName().equals("expr");
-
-        final Token[] children = token.getChildren();
-
-        builder.append("operand.");
-        builder.append(children[0].getValue());
-        builder.append("()");
-
-        if (!(children.length > 1)) {
-            return;
-        }
-
-        builder.append(" % ");
-        builder.append(children[1].allByName("value").get(0).getValue());
-    }
-
-    private String[] unwrapRange(final Token token) {
-        assert !token.getType().getName().equals("range");
-        return new String[]{token.getChildren()[0].getValue(), token.getChildren()[2].getValue()};
-    }
-
     private void generateClass(final String file) throws IOException {
         final JavaFileObject sourceFile = processingEnv.getFiler().createSourceFile("net.quickwrite.localizer.PluralRuleChecker");
         final Writer writer = sourceFile.openWriter();
@@ -350,10 +223,6 @@ public class PluralRuleProcessor extends AbstractProcessor {
         final String className = getAnnotationValue(mirror, name).orElseThrow().getValue().toString();
 
         return new InternalClass(className);
-    }
-
-    private static record PluralRuleTuple(String type, String unwrappedConditions) {
-
     }
 
     private static class InternalClass {
