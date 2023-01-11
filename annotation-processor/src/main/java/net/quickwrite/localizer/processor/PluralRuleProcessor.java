@@ -110,7 +110,11 @@ public class PluralRuleProcessor extends AbstractProcessor {
             generator.addImport(category.getFullName());
         }
 
-        generator.addAttribute("private final Function<PluralOperand, PluralCategory> localizationFunction;");
+        generator.addAttribute("private final Function<" +
+                operand.getClassName() +
+                ", " +
+                category.getClassName() +
+                "> localizationFunction;");
 
         for (int i = 0; i < pluralRules.getLength(); i++) {
             final StringBuilder builder = new StringBuilder();
@@ -142,17 +146,27 @@ public class PluralRuleProcessor extends AbstractProcessor {
             }
         }
 
-        generator.addConstructor("""
-                PluralRuleChecker(final Function<PluralOperand, PluralCategory> localizationFunction) {
+        generator.addConstructor(
+                String.format("""
+                PluralRuleChecker(final Function<%s, %s> localizationFunction) {
                     this.localizationFunction = localizationFunction;
                 }
-                """);
+                """,
+                operand.getClassName(),
+                category.getClassName()
+            )
+        );
 
-        generator.addMethod("""
-                        public PluralCategory getCategory(final PluralOperand operand) {
+        generator.addMethod(
+                String.format("""
+                        public %s getCategory(final %s operand) {
                             return this.localizationFunction.apply(operand);
                         }
-                        """)
+                        """,
+                        category.getClassName(),
+                        operand.getClassName()
+                        )
+                )
                 .addMethod("""
                         private static boolean isInRange(int value, int min, int max) {
                             return min <= value && value <= max;
