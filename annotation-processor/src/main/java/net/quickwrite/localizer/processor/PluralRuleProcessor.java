@@ -29,28 +29,33 @@ import java.util.*;
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 @AutoService(Processor.class)
 public class PluralRuleProcessor extends AbstractProcessor {
+    private Lexer lexer;
+    private NodeList pluralRules;
+
     @Override
-    public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+
         final File file = getInputFile("/plural-rule-syntax.bnf");
 
-        final Lexer lexer = BNFParser.createLexer(file.toPath());
+        lexer = BNFParser.createLexer(file.toPath());
         lexer.setRuleByName(CullStrategy.DELETE_ALL, "sep", "samples");
         lexer.setRuleByName(CullStrategy.LIFT_CHILDREN, "digit");
 
-        final Document document;
         try {
-            document = getXMLDocument("/plurals.xml");
+            final Document document = getXMLDocument("/plurals.xml");
+
+            pluralRules = document.getElementsByTagName("pluralRules");
         } catch (final ParserConfigurationException | IOException | SAXException e) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                     "An exception occurred while trying to parse the input file for @PluralRuleGen -> \n" +
                             Arrays.toString(e.getStackTrace())
             );
-
-            return false;
         }
+    }
 
-        final NodeList list = document.getElementsByTagName("pluralRules");
-
+    @Override
+    public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
         try {
             for (final Element element : roundEnv.getRootElements()) {
 
@@ -64,9 +69,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
                     writePluralRuleFile(
                             ruleGen.packageName(),
                             getAnnotationClassValue(element, PluralRuleGen.class, "operand"),
-                            getAnnotationClassValue(element, PluralRuleGen.class, "category"),
-                            lexer,
-                            list
+                            getAnnotationClassValue(element, PluralRuleGen.class, "category")
                     );
                 } catch (final IOException exception) {
                     exception.printStackTrace();
@@ -91,9 +94,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
 
     private void writePluralRuleFile(final String packageName,
                                      final InternalClass operand,
-                                     final InternalClass category,
-                                     final Lexer lexer,
-                                     final NodeList pluralRules)
+                                     final InternalClass category)
             throws IOException {
         final JEnumFileGenerator generator = new JEnumFileGenerator(
                 packageName,
