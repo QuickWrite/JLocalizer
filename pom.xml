@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>net.quickwrite.localizer</groupId>
-    <artifactId>Localizer</artifactId>
+    <artifactId>JLocalizer</artifactId>
     <packaging>pom</packaging>
     <version>0.0.1-SNAPSHOT</version>
     <modules>

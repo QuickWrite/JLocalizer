@@ -1,4 +1,4 @@
-# Localizer
+# JLocalizer
 Some useful localization elements for Java.
 
 ## Tools
