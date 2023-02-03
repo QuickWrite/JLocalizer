@@ -24,6 +24,7 @@
             <groupId>net.quickwrite.localizer</groupId>
             <artifactId>annotation-processor</artifactId>
             <version>0.1.0-alpha</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
