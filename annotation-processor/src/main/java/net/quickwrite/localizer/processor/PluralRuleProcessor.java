@@ -127,7 +127,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
         for (final PluralRule rule : pluralRules) {
             final StringBuilder builder = new StringBuilder();
 
-            final String firstLocale = rule.getLocales()[0];
+            final String firstLocale = rule.getLocales()[0].toLowerCase();
             builder.append(firstLocale);
 
             builder.append("((operand) -> {\n");
@@ -145,7 +145,7 @@ public class PluralRuleProcessor extends AbstractProcessor {
             generator.addEnumValue(builder.toString());
 
             for (int j = 1; j < rule.getLocales().length; j++) {
-                final String result = rule.getLocales()[j].toUpperCase() +
+                final String result = rule.getLocales()[j].toLowerCase() +
                         "(" + firstLocale + ".localizationFunction)";
 
                 generator.addEnumValue(result);
