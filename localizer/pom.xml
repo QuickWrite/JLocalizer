@@ -5,11 +5,12 @@
     <parent>
         <artifactId>JLocalizer</artifactId>
         <groupId>net.quickwrite.localizer</groupId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>0.1.0-alpha</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>localizer</artifactId>
+    <version>0.1.0-alpha</version>
 
     <properties>
         <maven.compiler.source>16</maven.compiler.source>
@@ -22,7 +23,7 @@
         <dependency>
             <groupId>net.quickwrite.localizer</groupId>
             <artifactId>annotation-processor</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>0.1.0-alpha</version>
         </dependency>
     </dependencies>
 
