@@ -20,6 +20,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Writer;
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -28,15 +29,15 @@ import java.util.*;
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 @AutoService(Processor.class)
 public class PluralRuleProcessor extends AbstractProcessor {
-    private List<PluralRule> pluralRules;
+    private static List<PluralRule> pluralRules;
 
     @Override
-    public synchronized void init(ProcessingEnvironment processingEnv) {
+    public synchronized void init(final ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
 
-        final File file = getInputFile("/plural-rule-syntax.bnf");
+        final InputStream file = getInputFile("/plural-rule-syntax.bnf");
 
-        final Lexer lexer = BNFParser.createLexer(file.toPath());
+        final Lexer lexer = BNFParser.createLexer(file);
         lexer.setRuleByName(CullStrategy.DELETE_ALL, "sep", "samples");
         lexer.setRuleByName(CullStrategy.LIFT_CHILDREN, "digit");
 
@@ -89,8 +90,8 @@ public class PluralRuleProcessor extends AbstractProcessor {
         return true;
     }
 
-    private File getInputFile(final String path) throws NullPointerException {
-        return new File(Objects.requireNonNull(this.getClass().getResource(path)).getFile());
+    private InputStream getInputFile(final String path) throws NullPointerException {
+        return Objects.requireNonNull(this.getClass().getResourceAsStream(path));
     }
 
     private Document getXMLDocument(final String path)
