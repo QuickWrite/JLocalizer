@@ -61,4 +61,15 @@
             </plugin>
         </plugins>
     </build>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>cloudsmith</id>
+            <url>https://maven.cloudsmith.io/quickwrite-net/jlocalizer/</url>
+        </snapshotRepository>
+        <repository>
+            <id>cloudsmith</id>
+            <url>https://maven.cloudsmith.io/quickwrite-net/jlocalizer/</url>
+        </repository>
+    </distributionManagement>
 </project>
